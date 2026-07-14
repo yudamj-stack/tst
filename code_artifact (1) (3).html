@@ -1,0 +1,1738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>인공위성 궤도 운동 카드 시뮬레이터</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght=400;600;700;800&display=swap');
+        body {
+            font-family: 'Pretendard', sans-serif;
+            user-select: none;
+        }
+        /* Card Drag & Drop Highlights */
+        .drag-over {
+            border-color: #3b82f6 !important;
+            background-color: rgba(59, 130, 246, 0.15) !important;
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+        }
+        .card-active {
+            transform: scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between">
+
+    <!-- Header -->
+    <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 p-2 rounded-lg text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-white">인공위성 우주 코인 상점 & 시뮬레이터</h1>
+                    <p class="text-xs text-slate-400">공전하며 코인을 모으고 나만의 최첨단 인공위성으로 업그레이드하세요!</p>
+                </div>
+            </div>
+            <!-- Header Coin Display -->
+            <div class="flex items-center space-x-4">
+                <div class="bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-1.5 flex items-center space-x-2 shadow-lg animate-pulse">
+                    <span class="text-lg">🪙</span>
+                    <span id="header-coin-count" class="text-md font-black font-mono text-amber-400">150</span>
+                    <span class="text-xs text-amber-500 font-bold">코인</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow w-full items-start">
+        
+        <!-- Left Column: Simulator & Dashboard -->
+        <section class="lg:col-span-7 flex flex-col gap-4 w-full">
+            <!-- Simulation Space -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex flex-col shadow-2xl relative h-[440px] lg:h-[480px] w-full">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-md font-bold text-slate-300 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span> 실시간 우주 궤도 모니터
+                    </h2>
+                    <div class="flex gap-2">
+                        <button id="btn-toggle-vectors" class="px-2.5 py-1 text-xs rounded border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 transition">
+                            벡터 숨기기
+                        </button>
+                        <span id="orbit-status" class="px-2.5 py-1 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                            카드 장착 대기 중
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Simulation Space (Canvas Container) -->
+                <div class="relative flex-grow bg-black rounded-xl overflow-hidden border border-slate-900">
+                    <canvas id="space-canvas" class="w-full h-full block"></canvas>
+                    
+                    <!-- Beautiful Overlay Legends for Orbit Types -->
+                    <div class="absolute bottom-3 right-3 bg-slate-900/90 border border-slate-800 p-2.5 rounded-lg text-[10px] space-y-1 shadow-lg select-none backdrop-blur-sm z-10">
+                        <div class="font-bold text-slate-300 border-b border-slate-800 pb-1 mb-1">궤도 종류 선 범례</div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3.5 h-0 border-t-2 border-violet-500 inline-block"></span>
+                            <span class="text-violet-400 font-semibold">실제 타원 궤도</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3.5 h-0 border-t-2 border-emerald-400 inline-block"></span>
+                            <span class="text-emerald-300 font-semibold">실제 원 궤도</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3.5 h-0 border-t-2 border-amber-400 inline-block"></span>
+                            <span class="text-amber-400">중력 탈출 경로</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-3.5 h-0 border-t-2 border-rose-500 inline-block"></span>
+                            <span class="text-rose-400">지구 추락 경로</span>
+                        </div>
+                    </div>
+
+                    <!-- Crash Overlay -->
+                    <div id="crash-overlay" class="absolute inset-0 bg-red-950/40 backdrop-blur-[2px] opacity-0 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center z-20">
+                        <span class="text-red-500 font-extrabold text-3xl tracking-widest animate-bounce">지구 추락! (CRASH)</span>
+                        <p class="text-xs text-slate-300 mt-2">더 강력한 속력 카드를 조합해보세요.</p>
+                    </div>
+
+                    <!-- Escape Overlay -->
+                    <div id="escape-overlay" class="absolute inset-0 bg-amber-950/30 backdrop-blur-[2px] opacity-0 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center z-20">
+                        <span class="text-amber-400 font-extrabold text-3xl tracking-widest animate-pulse">중력권 탈출 (ESCAPE)</span>
+                        <p class="text-xs text-slate-300 mt-2">속도가 지구 중력을 이겨내어 우주 너머로 날아갑니다.</p>
+                    </div>
+
+                    <!-- Shield Activation Popup Alert -->
+                    <div id="shield-alert" class="absolute top-4 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white font-extrabold text-xs px-5 py-2.5 rounded-full border border-blue-400 shadow-xl opacity-0 pointer-events-none transition-all duration-300 z-30 flex items-center space-x-2">
+                        <span>🛡️</span>
+                        <span>비상 중력 이온 보호막 발동! 긴급 탈출 부스터 가동 완료!</span>
+                    </div>
+
+                    <!-- Stage Success Overlay -->
+                    <div id="success-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center z-30 p-6 text-center">
+                        <div class="bg-slate-900 border border-emerald-500 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+                            <div class="text-emerald-400 flex justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 animate-bounce" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-2xl font-black text-emerald-400">STAGE COMPLETE!</h3>
+                            <p id="success-message" class="text-xs text-slate-300 leading-relaxed">
+                                미션을 성공적으로 완수하여 궤도의 메커니즘을 훌륭히 이행했습니다.
+                            </p>
+                            <!-- Bonus coin reward showcase -->
+                            <div class="bg-amber-500/10 border border-amber-500/20 py-2 rounded-xl text-xs font-bold text-amber-400 font-mono">
+                                🎁 스테이지 완수 보너스: +50 코인 지급완료!
+                            </div>
+                            <button id="btn-next-stage" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm transition active:scale-95 shadow-md shadow-emerald-950">
+                                다음 단계 도전하기 ➡️
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Beautiful Custom Error Overlay -->
+                    <div id="system-error-overlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 flex flex-col items-center justify-center z-30 p-6 text-center">
+                        <div class="bg-slate-900 border border-red-500/40 rounded-2xl p-6 max-w-sm w-full shadow-2xl space-y-4">
+                            <div class="text-red-500 flex justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <h3 class="text-lg font-black text-red-400">시스템 오류: 카드 미스매치</h3>
+                            <div id="error-details" class="text-xs text-slate-300 space-y-2 text-left bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                                <!-- Dynamic Error Messages -->
+                            </div>
+                            <button id="btn-close-error" class="w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition active:scale-95 shadow-md">
+                                시스템 재설정하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Realtime Metrics Dashboard -->
+            <div class="grid grid-cols-4 gap-3">
+                <!-- Velocity Box -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow">
+                    <span class="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>현재 속도
+                    </span>
+                    <div class="mt-1 flex items-baseline space-x-1">
+                        <span id="data-velocity" class="text-xl font-extrabold font-mono text-amber-400">0.00</span>
+                        <span class="text-[10px] text-slate-500">km/s</span>
+                    </div>
+                </div>
+                <!-- Altitude Box -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow">
+                    <span class="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>지표 고도
+                    </span>
+                    <div class="mt-1 flex items-baseline space-x-1">
+                        <span id="data-altitude" class="text-xl font-extrabold font-mono text-emerald-400">0</span>
+                        <span class="text-[10px] text-slate-500">km</span>
+                    </div>
+                </div>
+                <!-- Mass Box -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow">
+                    <span class="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>위성 무게
+                    </span>
+                    <div class="mt-1 flex items-baseline space-x-1">
+                        <span id="data-mass" class="text-xl font-extrabold font-mono text-purple-400">0</span>
+                        <span class="text-[10px] text-slate-500">kg</span>
+                    </div>
+                </div>
+                <!-- Gravitational Force Box -->
+                <div class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow">
+                    <span class="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>현재 만유인력
+                    </span>
+                    <div class="mt-1 flex items-baseline space-x-1">
+                        <span id="data-force" class="text-xl font-extrabold font-mono text-red-400">0.00</span>
+                        <span class="text-[10px] text-slate-500">N</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Column: Control Center, Shop & Quiz Systems -->
+        <section class="lg:col-span-5 flex flex-col gap-4 w-full">
+            
+            <!-- Interactive Mission/Stage Panel -->
+            <div class="bg-slate-900 border border-blue-500/30 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-bold text-blue-400 tracking-wider uppercase">현재 우주 미션</span>
+                    <!-- Stage Quick Selector -->
+                    <div class="flex gap-1" id="stage-indicators">
+                        <button class="stage-dot w-6 h-6 rounded-full bg-blue-600 text-[10px] font-black flex items-center justify-center text-white cursor-pointer" data-level="1">1</button>
+                        <button class="stage-dot w-6 h-6 rounded-full bg-slate-800 text-[10px] font-black flex items-center justify-center text-slate-400 cursor-pointer" data-level="2">2</button>
+                        <button class="stage-dot w-6 h-6 rounded-full bg-slate-800 text-[10px] font-black flex items-center justify-center text-slate-400 cursor-pointer" data-level="3">3</button>
+                        <button class="stage-dot w-6 h-6 rounded-full bg-slate-800 text-[10px] font-black flex items-center justify-center text-slate-400 cursor-pointer" data-level="4">4</button>
+                    </div>
+                </div>
+                <div class="space-y-1.5">
+                    <h4 id="mission-title" class="text-md font-extrabold text-white">1단계: 안정적인 원궤도 만들기</h4>
+                    <p id="mission-desc" class="text-xs text-slate-300 leading-relaxed">
+                        위성이 우주로 탈출하거나 지구로 추락하지 않고 완벽한 원을 그리며 지구 주위를 계속 도는 원궤도를 완성해 보세요.
+                    </p>
+                </div>
+
+                <!-- Live Orbit Lap Progress Bar -->
+                <div class="bg-slate-950/80 p-3 rounded-xl border border-slate-800/80 space-y-2">
+                    <div class="flex justify-between items-center text-xs">
+                        <span id="progress-label" class="font-semibold text-blue-400">궤도 완주 진행률</span>
+                        <span id="progress-percent" class="font-bold text-slate-200 font-mono">0%</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="progress-bar-fill" class="h-full w-0 bg-blue-500 rounded-full transition-all duration-100 ease-out"></div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 text-xs flex gap-2">
+                    <span class="text-amber-400">💡</span>
+                    <p id="mission-hint" class="text-slate-400"><strong class="text-slate-300">힌트:</strong> 발사 속력은 6.9 km/s, 발사 방향은 수평(0도)으로 조합해 보세요.</p>
+                </div>
+            </div>
+
+            <!-- Tab Buttons (Launch, Shop, Quiz) -->
+            <div class="grid grid-cols-3 gap-2">
+                <button id="tab-launch" class="py-2.5 rounded-xl font-bold text-xs bg-slate-800 text-blue-400 border border-blue-500/30 shadow-md">
+                    🛰️ 발사대
+                </button>
+                <button id="tab-shop" class="py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md">
+                    🪙 상점
+                </button>
+                <button id="tab-quiz" class="py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md flex items-center justify-center gap-1">
+                    📖 미션 퀴즈
+                </button>
+            </div>
+
+            <!-- TAB 1: Launch Control Cockpit & Cards (Default) -->
+            <div id="panel-launch" class="space-y-4">
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[300px]">
+                    <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+                    <div>
+                        <h3 class="text-md font-bold text-slate-200 border-b border-slate-800 pb-2 mb-4 flex items-center gap-2">
+                            <span>📡 위성 제어실 발사 슬롯</span>
+                        </h3>
+
+                        <!-- Drag Slot Grid -->
+                        <div class="grid grid-cols-3 gap-3">
+                            <!-- Slot 1: Speed -->
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs text-slate-400 font-semibold mb-1.5">1. 발사 속력</span>
+                                <div id="slot-speed" data-type="speed" class="w-full h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/60 flex flex-col items-center justify-center p-2 text-center transition-all duration-200">
+                                    <span class="text-[11px] text-slate-500">속력 카드를<br>넣어주세요</span>
+                                </div>
+                            </div>
+
+                            <!-- Slot 2: Angle -->
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs text-slate-400 font-semibold mb-1.5">2. 발사 방향</span>
+                                <div id="slot-angle" data-type="angle" class="w-full h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/60 flex flex-col items-center justify-center p-2 text-center transition-all duration-200">
+                                    <span class="text-[11px] text-slate-500">방향 카드를<br>넣어주세요</span>
+                                </div>
+                            </div>
+
+                            <!-- Slot 3: Mass -->
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs text-slate-400 font-semibold mb-1.5">3. 위성 무게</span>
+                                <div id="slot-mass" data-type="mass" class="w-full h-24 rounded-xl border-2 border-dashed border-slate-700 bg-slate-950/60 flex flex-col items-center justify-center p-2 text-center transition-all duration-200">
+                                    <span class="text-[11px] text-slate-500">무게 카드를<br>넣어주세요</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Launch & Control Button Container -->
+                    <div class="mt-6 pt-4 border-t border-slate-800/60 flex flex-col gap-2">
+                        <!-- Launch Button -->
+                        <button id="btn-launch-card" disabled class="w-full py-3 rounded-xl text-center font-black text-sm tracking-widest bg-slate-800 text-slate-500 cursor-not-allowed transition-all duration-300 shadow-md">
+                            카드를 모두 장착해주세요
+                        </button>
+                        
+                        <div class="grid grid-cols-2 gap-2">
+                            <!-- Pause / Stop Button -->
+                            <button id="btn-pause" disabled class="py-2.5 rounded-xl text-center font-bold text-xs bg-slate-800 text-slate-400 border border-slate-700 cursor-not-allowed hover:bg-slate-700 hover:text-white transition active:scale-98">
+                                ⏸️ 비행 일시정지
+                            </button>
+                            <!-- Reset Button -->
+                            <button id="btn-reset" class="py-2.5 rounded-xl text-center font-bold text-xs bg-slate-950 border border-slate-800 text-slate-400 hover:bg-red-950/30 hover:border-red-900/50 hover:text-red-200 transition active:scale-98">
+                                🔄 전체 초기화
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Deck -->
+                <div class="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 shadow-xl">
+                    <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-blue-500"></span> 위성 파라미터 드래그 카드 덱
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <!-- Speed Cards Category -->
+                        <div>
+                            <span class="text-[11px] font-bold text-amber-500 uppercase tracking-wider">속력 값</span>
+                            <div class="grid grid-cols-5 gap-2 mt-1.5">
+                                <div draggable="true" data-type="speed" data-value="4.0" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-amber-500/25 p-2 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-amber-500 transition-all duration-200">
+                                    <span class="text-xs font-extrabold font-mono text-amber-400">4.0 km/s</span>
+                                </div>
+                                <div draggable="true" data-type="speed" data-value="6.9" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-emerald-500/25 p-2 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-emerald-500 transition-all duration-200">
+                                    <span class="text-xs font-extrabold font-mono text-emerald-400">6.9 km/s</span>
+                                </div>
+                                <div draggable="true" data-type="speed" data-value="8.0" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-cyan-500/25 p-2 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-cyan-500 transition-all duration-200">
+                                    <span class="text-xs font-extrabold font-mono text-cyan-400">8.0 km/s</span>
+                                </div>
+                                <div draggable="true" data-type="speed" data-value="9.0" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-violet-500/25 p-2 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-violet-500 transition-all duration-200">
+                                    <span class="text-xs font-extrabold font-mono text-violet-400">9.0 km/s</span>
+                                </div>
+                                <div draggable="true" data-type="speed" data-value="11.5" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-rose-500/25 p-2 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-rose-500 transition-all duration-200">
+                                    <span class="text-xs font-extrabold font-mono text-rose-400">11.5 km/s</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Angle Cards Category -->
+                        <div>
+                            <span class="text-[11px] font-bold text-sky-400 uppercase tracking-wider">방향 (발사 각도)</span>
+                            <div class="grid grid-cols-3 gap-2 mt-1.5">
+                                <div draggable="true" data-type="angle" data-value="0" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-sky-500/25 p-2.5 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-sky-500 transition-all duration-200">
+                                    <span class="text-sm font-extrabold font-mono text-sky-400">0도</span>
+                                </div>
+                                <div draggable="true" data-type="angle" data-value="45" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-blue-500/25 p-2.5 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-blue-500 transition-all duration-200">
+                                    <span class="text-sm font-extrabold font-mono text-blue-400">45도</span>
+                                </div>
+                                <div draggable="true" data-type="angle" data-value="90" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-indigo-500/25 p-2.5 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-indigo-500 transition-all duration-200">
+                                    <span class="text-sm font-extrabold font-mono text-indigo-400">90도</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mass Cards Category -->
+                        <div>
+                            <span class="text-[11px] font-bold text-purple-400 uppercase tracking-wider">무게 (질량)</span>
+                            <div class="grid grid-cols-3 gap-2 mt-1.5">
+                                <div draggable="true" data-type="mass" data-value="150" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-purple-500/25 p-2.5 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-purple-500 transition-all duration-200">
+                                    <span class="text-sm font-extrabold font-mono text-purple-400">150 kg</span>
+                                </div>
+                                <div draggable="true" data-type="mass" data-value="1500" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-fuchsia-500/25 p-2.5 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-fuchsia-500 transition-all duration-200">
+                                    <span class="text-sm font-extrabold font-mono text-fuchsia-400">1,500 kg</span>
+                                </div>
+                                <div draggable="true" data-type="mass" data-value="15000" class="physics-card cursor-grab bg-slate-800 hover:bg-slate-750 border border-pink-500/25 p-2.5 rounded-xl flex items-center justify-center active:cursor-grabbing hover:border-pink-500 transition-all duration-200">
+                                    <span class="text-sm font-extrabold font-mono text-pink-400">15,000 kg</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Upgrade Shop Panel -->
+            <div id="panel-shop" class="hidden space-y-4">
+                <div class="bg-slate-900 border border-amber-500/20 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+                    <div class="absolute inset-0 opacity-5 bg-[radial-gradient(#f59e0b_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
+                    
+                    <h3 class="text-md font-bold text-amber-400 border-b border-slate-800 pb-2 mb-4 flex items-center justify-between">
+                        <span>🪙 우주 기술 연구 및 상점</span>
+                        <div class="flex items-center space-x-1.5 text-xs bg-slate-950 px-2 py-1 rounded-lg">
+                            <span class="text-slate-400">소지 코인:</span>
+                            <span id="shop-coin-display" class="font-bold text-amber-400 font-mono">150</span>
+                        </div>
+                    </h3>
+
+                    <!-- Upgrade Items Grid -->
+                    <div class="space-y-3.5">
+                        <!-- Upgrade Item 1: Engine Flame Trail -->
+                        <div class="bg-slate-950/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-2xl mt-0.5">🚀</span>
+                                <div>
+                                    <h4 class="text-xs font-extrabold text-slate-200">이온 추진기 불꽃 연출</h4>
+                                    <p class="text-[10px] text-slate-400 mt-0.5">위성이 돌 때 푸른색 플라스마 불꽃 효과를 추가합니다.</p>
+                                </div>
+                            </div>
+                            <button id="shop-btn-trail" class="px-3 py-1.5 rounded-lg text-2xs font-extrabold bg-blue-600 text-white hover:bg-blue-500 transition shrink-0">
+                                150 🪙 구매
+                            </button>
+                        </div>
+
+                        <!-- Upgrade Item 2: Atmospheric Shield -->
+                        <div class="bg-slate-950/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-2xl mt-0.5">🛡️</span>
+                                <div>
+                                    <h4 class="text-xs font-extrabold text-slate-200">대기권 비상 탈출 쉴드</h4>
+                                    <p class="text-[10px] text-slate-400 mt-0.5">지구 추락 시 1회 방어하며, 안전 궤도로 추진 분사 상승시킵니다.</p>
+                                </div>
+                            </div>
+                            <button id="shop-btn-shield" class="px-3 py-1.5 rounded-lg text-2xs font-extrabold bg-blue-600 text-white hover:bg-blue-500 transition shrink-0">
+                                250 🪙 구매
+                            </button>
+                        </div>
+
+                        <!-- Upgrade Item 3: Orbit Predictor -->
+                        <div class="bg-slate-950/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between">
+                            <div class="flex items-start space-x-3">
+                                <span class="text-2xl mt-0.5">🔮</span>
+                                <div>
+                                    <h4 class="text-xs font-extrabold text-slate-200">미래 예상 궤도 예측기</h4>
+                                    <p class="text-[10px] text-slate-400 mt-0.5">발사 전에 카드의 수치를 분석하여 예상 비행 궤도를 얇게 미리 보여줍니다.</p>
+                                </div>
+                            </div>
+                            <button id="shop-btn-predictor" class="px-3 py-1.5 rounded-lg text-2xs font-extrabold bg-blue-600 text-white hover:bg-blue-500 transition shrink-0">
+                                500 🪙 구매
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Historical Science Quiz Panel -->
+            <div id="panel-quiz" class="hidden space-y-4">
+                <div class="bg-slate-900 border border-blue-500/20 rounded-2xl p-5 shadow-2xl relative overflow-hidden">
+                    <div class="absolute inset-0 opacity-5 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none"></div>
+                    
+                    <h3 class="text-md font-bold text-blue-400 border-b border-slate-800 pb-2 mb-4 flex items-center justify-between">
+                        <span>📖 중력과 인공위성 물리 퀴즈</span>
+                        <span class="text-2xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md font-extrabold">정답 보상: +100 🪙</span>
+                    </h3>
+
+                    <!-- Quiz Content Container -->
+                    <div id="quiz-card-box" class="space-y-4 bg-slate-950/50 p-4 rounded-xl border border-slate-800">
+                        <!-- Dynamic quiz state render -->
+                        <div id="quiz-question-box" class="space-y-1">
+                            <span class="text-2xs text-slate-500 font-bold tracking-widest uppercase">문제 <span id="quiz-num">1</span>/3</span>
+                            <p id="quiz-text" class="text-xs md:text-sm font-bold text-slate-200 leading-relaxed">
+                                17세기 아이작 뉴턴은 만유인력 법칙을 통해 중력이 달과 인공위성 같은 물체를 지구 주위로 공전하게 만드는 원리를 설명했습니다. 중력이 인공위성에서 하는 주요 역할은 무엇일까요?
+                            </p>
+                        </div>
+
+                        <!-- Quiz Answers Grid -->
+                        <div id="quiz-options-container" class="grid grid-cols-1 gap-2">
+                            <!-- Options will be rendered dynamically -->
+                        </div>
+
+                        <!-- Quiz Feedback / Result message -->
+                        <div id="quiz-feedback" class="hidden p-3 rounded-lg text-xs font-semibold leading-relaxed">
+                            <!-- correct/incorrect status -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-950 py-4 px-6 border-t border-slate-900 text-center text-xs text-slate-600">
+        <p>© 2026 Orbital Dynamics Lab. Designed for Physics & Astronomy High School Curriculum.</p>
+    </footer>
+
+    <!-- Interactive Script -->
+    <script>
+        // --- STAGE / MISSION CONFIGURATION ---
+        const STAGES = [
+            {
+                level: 1,
+                title: "1단계: 안정적인 원궤도 만들기",
+                description: "위성이 우주로 탈출하거나 지구로 추락하지 않고 완벽한 원을 그리며 지구 주위를 계속 도는 원궤도를 완성해 보세요.",
+                targetStatus: "원궤도 비행",
+                isOrbitType: true,
+                hint: "발사 속력은 6.9 km/s, 발사 방향은 수평(0도)으로 조합해 보세요.",
+                successText: "완벽합니다! 중력과 원심력이 멋지게 균형을 이루어 아름다운 원궤도에 안착했습니다."
+            },
+            {
+                level: 2,
+                title: "2단계: 찌그러진 타원궤도 만들기",
+                description: "위성이 동그란 원이 아닌, 찌그러진 타원 모양으로 지구 주변을 계속 돌 수 있도록 궤도를 만드세요.",
+                targetStatus: "타원궤도 비행",
+                isOrbitType: true,
+                hint: "방향을 0도로 유지한 채 새로 추가된 속력인 8.0 km/s 카드를 사용하여 발사해 보세요!",
+                successText: "성공입니다! 위성의 궤도는 속력이나 각도가 원궤도 기준에서 멀어지면 타원 형태로 변형됩니다."
+            },
+            {
+                level: 3,
+                title: "3단계: 지구 인력권 탈출하기",
+                description: "지구가 잡아당기는 만유인력 권역을 힘차게 뚫고 우주 너머 미지의 영역으로 탈출하는 궤도를 그리세요.",
+                targetStatus: "탈출 쌍곡선",
+                isOrbitType: false,
+                hint: "지구의 탈출 속도인 11.2 km/s 이상의 가장 강력한 속력 카드를 결합해 보세요.",
+                successText: "탈출 완료! 탈출 속도인 약 11.2 km/s 이상의 에너지를 얻어 지구의 중력권을 완전히 돌파했습니다."
+            },
+            {
+                level: 4,
+                title: "4단계: 초대형 위성 원궤도 발사",
+                description: "무려 15,000 kg짜리 초대형 인공위성을 안전한 원궤도에 올리세요. 무게가 커지면 필요한 발사 속도는 어떻게 될까요?",
+                targetStatus: "원궤도 비행",
+                isOrbitType: true,
+                requiredMass: 15000,
+                hint: "무게 카드를 15,000 kg으로 넣고, 1단계에서 썼던 원궤도용 속력과 방향을 그대로 장착해보세요.",
+                successText: "유의미한 물리 지식을 발견하셨군요! 인공위성의 무게(질량)가 무거워져도 중력가속도는 동일하므로 필요한 발사 속력은 바뀌지 않습니다!"
+            }
+        ];
+
+        // --- HISTORICAL SCIENCE QUIZ DATA ---
+        const QUIZ_LIST = [
+            {
+                question: "17세기 아이작 뉴턴은 만유인력 법칙을 통해 중력이 달과 인공위성 같은 물체를 지구 주위로 공전하게 만드는 원리를 설명했습니다. 인공위성이 지구의 원궤도를 계속 돌 때, 지구의 '중력'은 어떤 역할을 하고 있을까요?",
+                options: [
+                    { id: 1, text: "위성을 우주 밖으로 밀어내는 '원심력' 역할" },
+                    { id: 2, text: "위성을 중심 방향으로 계속 당겨 회전시키는 '구심력' 역할" },
+                    { id: 3, text: "위성의 자전 방향과 속도를 조절하는 '전향력' 역할" },
+                    { id: 4, text: "위성의 무게를 지구보다 가볍게 만드는 '부력' 역할" }
+                ],
+                answer: 2,
+                explanation: "아이작 뉴턴은 만유인력(중력)이 위성이나 달을 안쪽으로 당기는 '구심력' 역할을 수행하여 직선으로 도망치려는 속도와 균형을 이루며 계속 돌게 만든다고 설명했습니다."
+            },
+            {
+                question: "1957년 인류는 뉴턴의 역학 원리를 바탕으로 최초의 인공위성을 쏘아 올렸습니다. 이때 구소련이 발사하여 냉전 시기 우주 개발 경쟁의 서막을 열었던 세계 최초의 인공위성 이름은 무엇일까요?",
+                options: [
+                    { id: 1, text: "아폴로 11호 (Apollo 11)" },
+                    { id: 2, text: "보이저 1호 (Voyager 1)" },
+                    { id: 3, text: "스푸트니크 1호 (Sputnik 1)" },
+                    { id: 4, text: "허블 우주 망원경 (Hubble)" }
+                ],
+                answer: 3,
+                explanation: "1957년 10월 4일 발사된 세계 최초의 인공위성은 '스푸트니크 1호'입니다. 이 위성은 단지 비프음 신호를 보냈을 뿐이지만 전 인류에게 우주 시대의 탄생을 선포했습니다."
+            },
+            {
+                question: "현대 사회에서 인공위성은 다양한 분야에서 활용됩니다. 다음 중 인공위성이 활용되는 분야와 기술이 바르게 연결되지 않은 것은 무엇일까요?",
+                options: [
+                    { id: 1, text: "기상위성 - 태풍 등 기상 변화 및 기후 실시간 모니터링" },
+                    { id: 2, text: "GPS위성 - 스마트폰 내비게이션 및 정밀 위치 측위 서비스" },
+                    { id: 3, text: "통신위성 - 인터넷 음영 지역 극복 및 실시간 방송 중계" },
+                    { id: 4, text: "탐사위성 - 지구 대기권의 공기를 보충하고 온난화를 인위적으로 지연" }
+                ],
+                answer: 4,
+                explanation: "인공위성은 지구 대기의 기체를 보충하거나 환경을 인위적으로 정화할 수는 없습니다. 기상, 통신, GPS 측위 등이 올바른 인공위성의 역할입니다."
+            }
+        ];
+
+        let activeQuizIdx = 0;
+        let answeredQuestions = {}; // tracks solved state to prevent double coin collection
+
+        // --- PHYSICAL CONSTANTS & CONVERSIONS ---
+        const G = 6.6743e-11; // 만유인력 상수
+        const M = 5.972e24;   // 지구 질량 (kg)
+        const R_earth = 6371; // 지구 반지름 (km)
+
+        // 고정 화면 축척 스케일
+        const maxRadius = R_earth + 8000;
+        let scale = 1.0; 
+
+        // --- HELPER PHYSICS FUNCTIONS ---
+        const getCircularVelocity = (altitudeKm) => {
+            const r_meters = (R_earth + altitudeKm) * 1000;
+            const v_meters = Math.sqrt((G * M) / r_meters);
+            return v_meters / 1000; // convert to km/s
+        };
+
+        const getEscapeVelocity = (altitudeKm) => {
+            return getCircularVelocity(altitudeKm) * Math.sqrt(2);
+        };
+
+        const dist = (x1, y1, x2, y2) => {
+            return Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
+        };
+
+        let currentStageIndex = 0;
+        let stageTargetTime = 0; // 초 단위로 올바른 비행이 누적 지속된 시간
+
+        // 궤도 완주 체크용 각도 변수
+        let previousAngle = null;
+        let cumulativeAngle = 0; // 라디안 단위 (2 * Math.PI 가 한 바퀴)
+
+        // --- UPGRADE SHOP STATE ---
+        let coins = 150; // 초기 지원금 150코인
+        let upgrades = {
+            trail: false,
+            shield: false,
+            predictor: false
+        };
+        let isShieldCharged = false; // 일회용 쉴드 충전 활성화 여부
+        let particles = []; // 이온 제트용 불꽃 파티클 어레이
+        let explosionParticles = []; // 쉴드 터질 때 파란 불꽃 연출용
+
+        // State Variables
+        let isRunning = false;
+        let showVectors = true;
+        let lastTimestamp = null;
+        let simSpeed = 1.2;
+
+        // Satellite Dynamics
+        let satX = 0; 
+        let satY = -R_earth - 2000; // 초기 발사 고도: 2,000km 고정
+        let satVx = 0;
+        let satVy = 0;
+        let pathHistory = [];
+
+        // Active Card Selections
+        let activeSpeed = null; // km/s
+        let activeAngle = null; // degrees
+        let activeMass = null;  // kg
+
+        // Slots tracking state
+        let slotContents = {
+            speed: null, // { type, value, text }
+            angle: null,
+            mass: null
+        };
+
+        // Canvas Setup
+        const canvas = document.getElementById('space-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Drag and Drop Elements
+        const cards = document.querySelectorAll('.physics-card');
+        const slots = {
+            speed: document.getElementById('slot-speed'),
+            angle: document.getElementById('slot-angle'),
+            mass: document.getElementById('slot-mass')
+        };
+
+        // UI Controls
+        const btnLaunchCard = document.getElementById('btn-launch-card');
+        const btnPause = document.getElementById('btn-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const btnToggleVectors = document.getElementById('btn-toggle-vectors');
+        const orbitStatusBadge = document.getElementById('orbit-status');
+
+        // Live Progress elements
+        const progressLabel = document.getElementById('progress-label');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressBarFill = document.getElementById('progress-bar-fill');
+
+        // Stage Selector Indicators
+        const stageDots = document.querySelectorAll('.stage-dot');
+        const missionTitle = document.getElementById('mission-title');
+        const missionDesc = document.getElementById('mission-desc');
+        const missionHint = document.getElementById('mission-hint');
+        const successOverlay = document.getElementById('success-overlay');
+        const successMessage = document.getElementById('success-message');
+        const btnNextStage = document.getElementById('btn-next-stage');
+
+        // Dashboard Indicators
+        const valVel = document.getElementById('data-velocity');
+        const valAlt = document.getElementById('data-altitude');
+        const valMass = document.getElementById('data-mass');
+        const valForce = document.getElementById('data-force');
+
+        // Overlays
+        const crashOverlay = document.getElementById('crash-overlay');
+        const escapeOverlay = document.getElementById('escape-overlay');
+        const systemErrorOverlay = document.getElementById('system-error-overlay');
+        const errorDetails = document.getElementById('error-details');
+        const btnCloseError = document.getElementById('btn-close-error');
+        const shieldAlert = document.getElementById('shield-alert');
+
+        // TAB elements
+        const tabLaunch = document.getElementById('tab-launch');
+        const tabShop = document.getElementById('tab-shop');
+        const tabQuiz = document.getElementById('tab-quiz');
+        const panelLaunch = document.getElementById('panel-launch');
+        const panelShop = document.getElementById('panel-shop');
+        const panelQuiz = document.getElementById('panel-quiz');
+        const headerCoinCount = document.getElementById('header-coin-count');
+        const shopCoinDisplay = document.getElementById('shop-coin-display');
+
+        // Shop Purchase Buttons
+        const shopBtnTrail = document.getElementById('shop-btn-trail');
+        const shopBtnShield = document.getElementById('shop-btn-shield');
+        const shopBtnPredictor = document.getElementById('shop-btn-predictor');
+
+        // Quiz DOM Elements
+        const quizNum = document.getElementById('quiz-num');
+        const quizText = document.getElementById('quiz-text');
+        const quizOptionsContainer = document.getElementById('quiz-options-container');
+        const quizFeedback = document.getElementById('quiz-feedback');
+
+
+        // --- TAB NAVIGATION LOGIC ---
+        tabLaunch.addEventListener('click', () => {
+            panelLaunch.classList.remove('hidden');
+            panelShop.classList.add('hidden');
+            panelQuiz.classList.add('hidden');
+            tabLaunch.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-800 text-blue-400 border border-blue-500/30 shadow-md";
+            tabShop.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md";
+            tabQuiz.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md flex items-center justify-center gap-1";
+        });
+
+        tabShop.addEventListener('click', () => {
+            panelShop.classList.remove('hidden');
+            panelLaunch.classList.add('hidden');
+            panelQuiz.classList.add('hidden');
+            tabShop.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-800 text-amber-400 border border-amber-500/30 shadow-md";
+            tabLaunch.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md";
+            tabQuiz.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md flex items-center justify-center gap-1";
+            updateShopUI();
+        });
+
+        tabQuiz.addEventListener('click', () => {
+            panelQuiz.classList.remove('hidden');
+            panelLaunch.classList.add('hidden');
+            panelShop.classList.add('hidden');
+            tabQuiz.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-800 text-emerald-400 border border-emerald-500/30 shadow-md flex items-center justify-center gap-1";
+            tabLaunch.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md";
+            tabShop.className = "py-2.5 rounded-xl font-bold text-xs bg-slate-900 text-slate-400 hover:text-white transition shadow-md";
+            renderQuiz();
+        });
+
+
+        // --- COIN SYSTEM MANAGEMENT ---
+        function updateCoins(amount) {
+            coins += amount;
+            headerCoinCount.textContent = coins.toLocaleString();
+            shopCoinDisplay.textContent = coins.toLocaleString();
+            updateShopUI();
+        }
+
+        // Shop Upgrades Rendering states
+        function updateShopUI() {
+            // Trail upgrade (150 🪙)
+            if (upgrades.trail) {
+                shopBtnTrail.textContent = "장착 완료 ✨";
+                shopBtnTrail.disabled = true;
+                shopBtnTrail.className = "px-3 py-1.5 rounded-lg text-2xs font-extrabold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shrink-0 cursor-default";
+            } else {
+                shopBtnTrail.disabled = coins < 150;
+                shopBtnTrail.className = `px-3 py-1.5 rounded-lg text-2xs font-extrabold transition shrink-0 ${coins >= 150 ? 'bg-amber-500 text-slate-950 hover:bg-amber-400' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+            }
+
+            // Shield upgrade (250 🪙, Recharge 150 🪙)
+            if (upgrades.shield) {
+                shopBtnShield.textContent = isShieldCharged ? "충전됨 (작동대기) 🛡️" : "사용됨 (재충전 필요)";
+                shopBtnShield.disabled = isShieldCharged || coins < 150; 
+                if (isShieldCharged) {
+                    shopBtnShield.className = "px-3 py-1.5 rounded-lg text-2xs font-extrabold bg-blue-600/20 text-blue-400 border border-blue-500/30 shrink-0 cursor-default";
+                } else {
+                    shopBtnShield.textContent = "150 🪙 재충전";
+                    shopBtnShield.className = `px-3 py-1.5 rounded-lg text-2xs font-extrabold transition shrink-0 ${coins >= 150 ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+                }
+            } else {
+                shopBtnShield.disabled = coins < 250;
+                shopBtnShield.className = `px-3 py-1.5 rounded-lg text-2xs font-extrabold transition shrink-0 ${coins >= 250 ? 'bg-amber-500 text-slate-950 hover:bg-amber-400' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+            }
+
+            // Predictor upgrade (500 🪙)
+            if (upgrades.predictor) {
+                shopBtnPredictor.textContent = "장착 완료 🔮";
+                shopBtnPredictor.disabled = true;
+                shopBtnPredictor.className = "px-3 py-1.5 rounded-lg text-2xs font-extrabold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 shrink-0 cursor-default";
+            } else {
+                shopBtnPredictor.disabled = coins < 500;
+                shopBtnPredictor.className = `px-3 py-1.5 rounded-lg text-2xs font-extrabold transition shrink-0 ${coins >= 500 ? 'bg-amber-500 text-slate-950 hover:bg-amber-400' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+            }
+        }
+
+        // Shop Buttons Clicks
+        shopBtnTrail.addEventListener('click', () => {
+            if (coins >= 150 && !upgrades.trail) {
+                upgrades.trail = true;
+                updateCoins(-150);
+            }
+        });
+
+        shopBtnShield.addEventListener('click', () => {
+            if (!upgrades.shield && coins >= 250) {
+                upgrades.shield = true;
+                isShieldCharged = true;
+                updateCoins(-250);
+            } else if (upgrades.shield && !isShieldCharged && coins >= 150) {
+                isShieldCharged = true;
+                updateCoins(-150);
+            }
+        });
+
+        shopBtnPredictor.addEventListener('click', () => {
+            if (coins >= 500 && !upgrades.predictor) {
+                upgrades.predictor = true;
+                updateCoins(-500);
+            }
+        });
+
+
+        // --- HISTORICAL SCIENCE QUIZ LOGIC ---
+        function renderQuiz() {
+            const quiz = QUIZ_LIST[activeQuizIdx];
+            quizNum.textContent = activeQuizIdx + 1;
+            quizText.textContent = quiz.question;
+            
+            quizOptionsContainer.innerHTML = "";
+            quizFeedback.classList.add("hidden");
+
+            quiz.options.forEach(option => {
+                const btn = document.createElement("button");
+                btn.className = "w-full p-3 text-xs text-left rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-850 hover:border-slate-700 transition flex justify-between items-center font-medium";
+                
+                // option text layout
+                btn.innerHTML = `
+                    <span>${option.id}. ${option.text}</span>
+                    <span class="text-slate-600 font-extrabold">선택</span>
+                `;
+
+                // If already solved correctly
+                if (answeredQuestions[activeQuizIdx]) {
+                    btn.disabled = true;
+                    btn.className = "w-full p-3 text-xs text-left rounded-xl bg-slate-900/40 border border-slate-900 text-slate-600 cursor-not-allowed flex justify-between items-center";
+                    if (option.id === quiz.answer) {
+                        btn.className = "w-full p-3 text-xs text-left rounded-xl bg-emerald-950/20 border border-emerald-900 text-emerald-400 cursor-not-allowed flex justify-between items-center font-bold";
+                        btn.innerHTML = `<span>${option.id}. ${option.text}</span><span class="text-emerald-400">✔️ 정답</span>`;
+                    }
+                } else {
+                    btn.addEventListener("click", () => submitAnswer(option.id));
+                }
+
+                quizOptionsContainer.appendChild(btn);
+            });
+
+            // If already solved, display explanation right away
+            if (answeredQuestions[activeQuizIdx]) {
+                quizFeedback.className = "p-3 rounded-lg text-xs bg-emerald-950/40 border border-emerald-800 text-emerald-400 font-semibold block";
+                quizFeedback.innerHTML = `⭐ <strong>정답입니다! (+100 코인 획득 완료)</strong><br><p class="mt-1.5 text-slate-300 font-normal leading-relaxed">${quiz.explanation}</p>${getNextQuizBtn()}`;
+            }
+        }
+
+        function submitAnswer(selectedId) {
+            const quiz = QUIZ_LIST[activeQuizIdx];
+            
+            if (selectedId === quiz.answer) {
+                // Correct answer!
+                answeredQuestions[activeQuizIdx] = true;
+                updateCoins(100); // Reward!
+                quizFeedback.className = "p-3 rounded-lg text-xs bg-emerald-950/40 border border-emerald-800 text-emerald-400 font-semibold block animate-pulse";
+                quizFeedback.innerHTML = `⭐ <strong>정답입니다! 과학적 보너스 자금 +100 코인 지급!</strong><br><p class="mt-1.5 text-slate-300 font-normal leading-relaxed">${quiz.explanation}</p>${getNextQuizBtn()}`;
+                renderQuiz(); // Rerender to disable buttons
+            } else {
+                // Incorrect answer
+                quizFeedback.className = "p-3 rounded-lg text-xs bg-red-950/40 border border-red-900/50 text-red-400 font-semibold block";
+                quizFeedback.innerHTML = `❌ <strong>오답입니다!</strong> 다시 생각하고 알맞은 원리를 선택해 보세요.`;
+            }
+        }
+
+        function getNextQuizBtn() {
+            // Render next button if there's more quiz
+            if (activeQuizIdx < QUIZ_LIST.length - 1) {
+                return `<button onclick="window.nextQuiz()" class="mt-3 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 transition text-white font-extrabold rounded-lg text-2xs uppercase tracking-wide float-right block">다음 문제 ➡️</button><div class="clear-both"></div>`;
+            } else {
+                return `<p class="mt-3 text-2xs text-amber-400 font-bold text-right">🏆 인공위성 물리학 기초 퀴즈를 모두 마스터하셨습니다!</p>`;
+            }
+        }
+
+        // Global Quiz Navigation Binding
+        window.nextQuiz = function() {
+            if (activeQuizIdx < QUIZ_LIST.length - 1) {
+                activeQuizIdx++;
+                renderQuiz();
+            }
+        }
+
+
+        // --- STAGE SYSTEM MANAGEMENT ---
+        function loadStage(index) {
+            currentStageIndex = index;
+            const stage = STAGES[currentStageIndex];
+            
+            // Update Text Elements
+            missionTitle.textContent = stage.title;
+            missionDesc.textContent = stage.description;
+            missionHint.innerHTML = `<strong class="text-slate-300">힌트:</strong> ${stage.hint}`;
+            
+            // Highlight stage selector dot
+            stageDots.forEach((dot, idx) => {
+                if (idx === index) {
+                    dot.className = "stage-dot w-6 h-6 rounded-full bg-blue-600 text-[10px] font-black flex items-center justify-center text-white cursor-pointer";
+                } else {
+                    dot.className = "stage-dot w-6 h-6 rounded-full bg-slate-800 text-[10px] font-black flex items-center justify-center text-slate-400 cursor-pointer hover:bg-slate-700 hover:text-white";
+                }
+            });
+
+            // Hide overlays and reset
+            successOverlay.classList.add('pointer-events-none', 'opacity-0');
+            successOverlay.classList.remove('opacity-100');
+            stageTargetTime = 0;
+            resetSimulation();
+        }
+
+        // Stage Selector Clicks
+        stageDots.forEach((dot, idx) => {
+            dot.addEventListener('click', () => {
+                loadStage(idx);
+            });
+        });
+
+        // Trigger Success Overlay with Stage coin bonuses!
+        function triggerStageSuccess() {
+            isRunning = false;
+            const stage = STAGES[currentStageIndex];
+            successMessage.innerHTML = stage.successText;
+            
+            // Give stage bonus coin! (+50 coins!)
+            updateCoins(50);
+
+            // Adjust "Next Stage" button text on final level
+            if (currentStageIndex === STAGES.length - 1) {
+                btnNextStage.textContent = "🏆 모든 미션 마스터! 처음부터 다시하기";
+            } else {
+                btnNextStage.textContent = "다음 단계 도전하기 ➡️";
+            }
+
+            successOverlay.classList.remove('pointer-events-none', 'opacity-0');
+            successOverlay.classList.add('opacity-100');
+            updateUIState();
+        }
+
+        btnNextStage.addEventListener('click', () => {
+            if (currentStageIndex === STAGES.length - 1) {
+                loadStage(0); // Loop back
+            } else {
+                loadStage(currentStageIndex + 1); // Next Level
+            }
+        });
+
+        // Check if Mission Target is achieved during flight
+        function checkMissionSuccess(statusText, currentAlt, currentSpeed) {
+            if (!isRunning) return;
+
+            const stage = STAGES[currentStageIndex];
+            
+            // Check condition match
+            let isConditionMet = (statusText === stage.targetStatus);
+
+            // Additional Stage 4 mass check
+            if (stage.requiredMass) {
+                if (activeMass !== stage.requiredMass) {
+                    isConditionMet = false;
+                }
+            }
+
+            if (isConditionMet) {
+                if (stage.isOrbitType) {
+                    // 원궤도, 타원궤도 등 궤도 운동 단계는 지구를 1바퀴(2 * Math.PI) 다 돈 이후에만 성공
+                    if (cumulativeAngle >= 2 * Math.PI - 0.05) {
+                        triggerStageSuccess();
+                    }
+                } else {
+                    // 탈출 경로 (3단계) 미션인 경우 한 바퀴를 돌 수 없으므로, 탈출 속도를 유지한 채 일정 거리 이상 벌어지면 성공
+                    if (currentAlt >= 5000) {
+                        stageTargetTime += 0.05;
+                        if (stageTargetTime >= 1.5) {
+                            triggerStageSuccess();
+                        }
+                    }
+                }
+            } else {
+                // 물리 궤도 조건이 틀어지거나 추락 중이면 타겟 타이머 및 각도 누적 초기화
+                stageTargetTime = 0;
+                cumulativeAngle = 0;
+            }
+
+            updateProgressBar(currentAlt);
+        }
+
+        // 진행률 바 갱신 함수
+        function updateProgressBar(currentAlt) {
+            const stage = STAGES[currentStageIndex];
+            if (stage.isOrbitType) {
+                progressLabel.textContent = "궤도 완주 진행도";
+                const percent = Math.min(100, Math.round((cumulativeAngle / (2 * Math.PI)) * 100));
+                progressPercent.textContent = percent + "%";
+                progressBarFill.style.width = percent + "%";
+                progressBarFill.className = "h-full bg-blue-500 rounded-full transition-all duration-100 ease-out";
+            } else {
+                progressLabel.textContent = "중력 탈출 비행 고도";
+                const percent = Math.min(100, Math.max(0, Math.round(((currentAlt - 2000) / 3000) * 100)));
+                progressPercent.textContent = percent + "%";
+                progressBarFill.style.width = percent + "%";
+                progressBarFill.className = "h-full bg-amber-500 rounded-full transition-all duration-100 ease-out";
+            }
+        }
+
+        // --- DRAG AND DROP LOGIC ---
+        let draggedCard = null;
+
+        cards.forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                draggedCard = card;
+                card.classList.add('opacity-40', 'card-active');
+                e.dataTransfer.setData('text/plain', ''); // Firefox 지원용
+            });
+
+            card.addEventListener('dragend', () => {
+                draggedCard = null;
+                card.classList.remove('opacity-40', 'card-active');
+            });
+        });
+
+        Object.values(slots).forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                if (draggedCard) {
+                    slot.classList.add('drag-over');
+                }
+            });
+
+            slot.addEventListener('dragleave', () => {
+                slot.classList.remove('drag-over');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('drag-over');
+                
+                if (draggedCard) {
+                    const cardType = draggedCard.getAttribute('data-type');
+                    const targetType = slot.getAttribute('data-type');
+                    const val = parseFloat(draggedCard.getAttribute('data-value'));
+                    const text = draggedCard.querySelector('span').textContent;
+                    
+                    // 슬롯 드롭 상태 기록
+                    slotContents[targetType] = {
+                        type: cardType,
+                        value: val,
+                        text: text
+                    };
+
+                    // 드롭된 카드 UI 렌더링
+                    let labelColor = cardType === 'speed' ? 'text-amber-400 border-amber-500/30' : cardType === 'angle' ? 'text-sky-400 border-sky-500/30' : 'text-purple-400 border-purple-500/30';
+                    let labelName = cardType === 'speed' ? '속력' : cardType === 'angle' ? '방향' : '무게';
+                    
+                    slot.innerHTML = `
+                        <div class="w-full h-full flex flex-col justify-center items-center bg-slate-950 p-1 rounded-lg border border-slate-800 animate-pulse">
+                            <span class="text-[9px] ${labelColor} font-bold uppercase">${labelName} 카드</span>
+                            <span class="text-xs font-black text-white mt-1 select-none">${text}</span>
+                            <button onclick="clearSlot('${targetType}')" class="text-[10px] text-red-400 hover:text-red-300 font-semibold mt-1 underline">제거</button>
+                        </div>
+                    `;
+
+                    checkReadyToLaunch();
+                    resetSimulation(); 
+                }
+            });
+        });
+
+        // 슬롯 개별 제거 기능
+        window.clearSlot = function(type) {
+            slotContents[type] = null;
+            if (type === 'speed') {
+                slots.speed.innerHTML = `<span class="text-[11px] text-slate-500">속력 카드를<br>넣어주세요</span>`;
+            } else if (type === 'angle') {
+                slots.angle.innerHTML = `<span class="text-[11px] text-slate-500">방향 카드를<br>넣어주세요</span>`;
+            } else if (type === 'mass') {
+                slots.mass.innerHTML = `<span class="text-[11px] text-slate-500">무게 카드를<br>넣어주세요</span>`;
+            }
+            checkReadyToLaunch();
+            resetSimulation();
+        }
+
+        // 세 슬롯 장착 완료 검사 및 버튼 활성화
+        function checkReadyToLaunch() {
+            if (slotContents.speed !== null && slotContents.angle !== null && slotContents.mass !== null) {
+                if (!isRunning) {
+                    btnLaunchCard.disabled = false;
+                    btnLaunchCard.className = "w-full py-3 rounded-xl text-center font-black text-sm tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer active:scale-98 shadow-lg shadow-emerald-950/40 transition-all duration-300";
+                    btnLaunchCard.textContent = "🚀 인공위성 발사!";
+                }
+                orbitStatusBadge.textContent = isRunning ? "정상 비행 중" : "발사 준비 완료";
+                orbitStatusBadge.className = isRunning ? "px-2.5 py-1 rounded text-xs font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30" : "px-2.5 py-1 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else {
+                btnLaunchCard.disabled = true;
+                btnLaunchCard.className = "w-full py-3 rounded-xl text-center font-black text-sm tracking-widest bg-slate-800 text-slate-500 cursor-not-allowed transition-all duration-300";
+                btnLaunchCard.textContent = "카드를 모두 장착해주세요";
+                orbitStatusBadge.textContent = "카드 장착 대기 중";
+                orbitStatusBadge.className = "px-2.5 py-1 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30";
+            }
+        }
+
+        // --- PHYSICS UPDATE LOGIC ---
+        function updatePhysics(dt) {
+            if (!isRunning) return;
+
+            const actualDt = dt * simSpeed * 950; 
+            const substeps = 10;
+            const subDt = actualDt / substeps;
+
+            for (let step = 0; step < substeps; step++) {
+                const r = Math.sqrt(satX * satX + satY * satY); // in km
+                if (r < R_earth) {
+                    // Shield Upgrade Interaction check
+                    if (upgrades.shield && isShieldCharged) {
+                        isShieldCharged = false; 
+                        updateShopUI(); 
+                        
+                        // 충돌 시 푸른색 에너지 폭발 조각 효과
+                        for (let k = 0; k < 20; k++) {
+                            explosionParticles.push({
+                                x: satX,
+                                y: satY,
+                                vx: (Math.random() - 0.5) * 10,
+                                vy: (Math.random() - 0.5) * 10,
+                                life: 1.0,
+                                size: 3 + Math.random() * 4
+                            });
+                        }
+
+                        // 비상 궤도 탈출 부스터 가동
+                        const normalX = satX / r;
+                        const normalY = satY / r;
+                        
+                        // 고도 밀어올리기 (600km)
+                        satX = normalX * (R_earth + 600);
+                        satY = normalY * (R_earth + 600);
+                        
+                        // 원 궤도 속력 주입
+                        satVx = -normalY * 7.2;
+                        satVy = normalX * 7.2;
+
+                        // Trigger Shield Warning Alert on screen
+                        shieldAlert.classList.remove('opacity-0', 'pointer-events-none');
+                        shieldAlert.classList.add('opacity-100');
+                        setTimeout(() => {
+                            shieldAlert.classList.add('opacity-0', 'pointer-events-none');
+                            shieldAlert.classList.remove('opacity-100');
+                        }, 3000);
+                        
+                        break;
+                    } else {
+                        // 보호막 없음: 추락 완료 처리
+                        isRunning = false;
+                        satX = (satX / r) * R_earth;
+                        satY = (satY / r) * R_earth;
+                        satVx = 0;
+                        satVy = 0;
+                        showCrash();
+                        break;
+                    }
+                }
+
+                // 가속도 계산 (a = GM / r^2)
+                const r_meters = r * 1000;
+                const a_meters = (G * M) / (r_meters * r_meters);
+                const a_km = a_meters / 1000;
+
+                const ax = -a_km * (satX / r);
+                const ay = -a_km * (satY / r);
+
+                satVx += ax * subDt;
+                satVy += ay * subDt;
+                satX += satVx * subDt;
+                satY += satVy * subDt;
+
+                // 실시간 회전 각도 트래킹 (한 바퀴 도는지 누적 연산)
+                let currentAngle = Math.atan2(satY, satX);
+                if (previousAngle !== null) {
+                    let angleDiff = currentAngle - previousAngle;
+                    
+                    while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+                    while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+                    
+                    cumulativeAngle += Math.abs(angleDiff);
+                }
+                previousAngle = currentAngle;
+
+                // Engine Flame Particles Upgrade
+                if (upgrades.trail && Math.random() < 0.35) {
+                    const satV = Math.sqrt(satVx * satVx + satVy * satVy);
+                    if (satV > 0) {
+                        particles.push({
+                            x: satX,
+                            y: satY,
+                            vx: -satVx * 0.15 + (Math.random() - 0.5) * 0.4,
+                            vy: -satVy * 0.15 + (Math.random() - 0.5) * 0.4,
+                            life: 1.0,
+                            size: 2 + Math.random() * 2.5
+                        });
+                    }
+                }
+            }
+
+            // Update Ion particles life
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt * 250;
+                p.y += p.vy * dt * 250;
+                p.life -= dt * 3.5;
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+
+            // Update explosion particles life
+            for (let i = explosionParticles.length - 1; i >= 0; i--) {
+                const ep = explosionParticles[i];
+                ep.x += ep.vx * dt * 300;
+                ep.y += ep.vy * dt * 300;
+                ep.life -= dt * 2.2;
+                if (ep.life <= 0) {
+                    explosionParticles.splice(i, 1);
+                }
+            }
+
+            const currentAlt = Math.sqrt(satX * satX + satY * satY) - R_earth;
+            const currentSpeed = Math.sqrt(satVx * satVx + satVy * satVy);
+
+            // 궤도 경로 저장
+            if (pathHistory.length === 0 || dist(satX, satY, pathHistory[pathHistory.length - 1].x, pathHistory[pathHistory.length - 1].y) > 12) {
+                pathHistory.push({ 
+                    x: satX, 
+                    y: satY,
+                    alt: currentAlt,
+                    vel: currentSpeed
+                });
+                if (pathHistory.length > 500) pathHistory.shift();
+            }
+
+            // 중력 탈출 감지
+            const escV = getEscapeVelocity(currentAlt);
+            if (currentSpeed >= escV && currentAlt > 3500) {
+                showEscape();
+            }
+
+            updateDashboard(currentAlt, currentSpeed);
+            updateStatusLabel(currentAlt, currentSpeed);
+        }
+
+        // Draw Space and Vectors
+        function drawSpace() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+
+            ctx.clearRect(0, 0, w, h);
+
+            // 우주 배경 성단
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            for (let i = 0; i < 40; i++) {
+                let x = (Math.sin(i * 987.6) * 0.5 + 0.5) * w;
+                let y = (Math.cos(i * 543.2) * 0.5 + 0.5) * h;
+                ctx.fillRect(x, y, 1.2, 1.2);
+            }
+
+            const earthRadiusPx = R_earth * scale;
+
+            // 1. Orbit Predictor Upgrade! (🔮 미래 예상 궤도 시뮬레이션선 그리기)
+            if (upgrades.predictor && !isRunning && slotContents.speed !== null && slotContents.angle !== null) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(167, 139, 250, 0.35)'; // 밝은 연보라색 투명 가이드라인
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([3, 5]);
+
+                // 가상 중력 시뮬레이션 복제본
+                let simX = 0;
+                let simY = -(R_earth + 2000);
+                const targetSpeed = slotContents.speed.value;
+                const targetAngle = slotContents.angle.value;
+                const angleRad = (targetAngle * Math.PI) / 180;
+                let simVx = targetSpeed * Math.cos(angleRad);
+                let simVy = -targetSpeed * Math.sin(angleRad);
+                
+                ctx.moveTo(cx + simX * scale, cy + simY * scale);
+
+                // 250스텝 앞을 가상 예측 연산
+                for (let s = 0; s < 250; s++) {
+                    const r = Math.sqrt(simX * simX + simY * simY);
+                    if (r < R_earth) break;
+
+                    const a = (G * M) / ((r * 1000) * (r * 1000)) / 1000;
+                    const ax = -a * (simX / r);
+                    const ay = -a * (simY / r);
+
+                    simVx += ax * 80; // 고속 연산 스텝 수치화
+                    simVy += ay * 80;
+                    simX += simVx * 80;
+                    simY += simVy * 80;
+
+                    ctx.lineTo(cx + simX * scale, cy + simY * scale);
+                    
+                    // 화면 밖으로 멀리 나갈 때 시뮬레이션 루프 중지
+                    if (Math.abs(simX) > 15000 || Math.abs(simY) > 15000) break;
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 2. 실제 비행 궤도선 그리기
+            if (pathHistory.length > 1) {
+                ctx.lineWidth = 2.5;
+                for (let i = 1; i < pathHistory.length; i++) {
+                    const pt1 = pathHistory[i - 1];
+                    const pt2 = pathHistory[i];
+                    
+                    const circularSpeed = getCircularVelocity(pt2.alt);
+                    const escapeSpeed = getEscapeVelocity(pt2.alt);
+                    
+                    let strokeColor = 'rgba(139, 92, 246, 0.85)'; // 기본 타원 (보라색)
+                    
+                    if (pt2.alt <= 0) {
+                        strokeColor = 'rgba(239, 68, 68, 0.8)'; // 추락 (빨간색)
+                    } else if (pt2.vel >= escapeSpeed) {
+                        strokeColor = 'rgba(245, 158, 11, 0.8)'; // 탈출 (황색)
+                    } else if (Math.abs(pt2.vel - circularSpeed) < 0.12) {
+                        strokeColor = 'rgba(16, 185, 129, 0.85)'; // 원궤도 정밀 비행 (초록색)
+                    }
+                    
+                    ctx.strokeStyle = strokeColor;
+                    ctx.beginPath();
+                    ctx.moveTo(cx + pt1.x * scale, cy + pt1.y * scale);
+                    ctx.lineTo(cx + pt2.x * scale, cy + pt2.y * scale);
+                    ctx.stroke();
+                }
+            }
+
+            // Particle Engine Flames Drawing
+            if (particles.length > 0) {
+                ctx.save();
+                for (let i = 0; i < particles.length; i++) {
+                    const p = particles[i];
+                    if (upgrades.trail) {
+                        ctx.fillStyle = `rgba(56, 189, 248, ${p.life})`; // Sky Blue flame
+                        ctx.beginPath();
+                        ctx.arc(cx + p.x * scale, cy + p.y * scale, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+                ctx.restore();
+            }
+
+            // Explosion particles drawing (쉴드가 터졌을 때 연출)
+            if (explosionParticles.length > 0) {
+                ctx.save();
+                for (let i = 0; i < explosionParticles.length; i++) {
+                    const ep = explosionParticles[i];
+                    ctx.fillStyle = `rgba(96, 165, 250, ${ep.life})`; // Bright blue explosion
+                    ctx.beginPath();
+                    ctx.arc(cx + ep.x * scale, cy + ep.y * scale, ep.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // 3. 지구 그리기
+            let earthGlow = ctx.createRadialGradient(cx, cy, earthRadiusPx * 0.9, cx, cy, earthRadiusPx * 1.35);
+            earthGlow.addColorStop(0, 'rgba(14, 116, 144, 0.35)');
+            earthGlow.addColorStop(0.6, 'rgba(56, 189, 248, 0.18)');
+            earthGlow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            ctx.fillStyle = earthGlow;
+            ctx.beginPath();
+            ctx.arc(cx, cy, earthRadiusPx * 1.35, 0, Math.PI * 2);
+            ctx.fill();
+
+            let earthGrad = ctx.createRadialGradient(cx - earthRadiusPx*0.2, cy - earthRadiusPx*0.2, earthRadiusPx*0.1, cx, cy, earthRadiusPx);
+            earthGrad.addColorStop(0, '#38bdf8');
+            earthGrad.addColorStop(0.4, '#0284c7');
+            earthGrad.addColorStop(1, '#0f172a');
+            
+            ctx.fillStyle = earthGrad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, earthRadiusPx, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 대륙 그리기
+            ctx.save(); 
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.55)'; 
+            ctx.beginPath();
+            ctx.arc(cx - earthRadiusPx * 0.3, cy - earthRadiusPx * 0.2, earthRadiusPx * 0.25, 0, Math.PI * 1.5);
+            ctx.arc(cx + earthRadiusPx * 0.2, cy + earthRadiusPx * 0.3, earthRadiusPx * 0.35, 0.5, Math.PI * 2.1);
+            ctx.arc(cx - earthRadiusPx * 0.1, cy + earthRadiusPx * 0.4, earthRadiusPx * 0.2, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.beginPath();
+            ctx.arc(cx, cy, earthRadiusPx, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore(); 
+
+            // 4. 인공위성 본체 그리기
+            const satPxX = cx + satX * scale;
+            const satPxY = cy + satY * scale;
+
+            // Satellite Skin Standard Visuals (은회색)
+            const satMainColor = '#f1f5f9'; 
+            const wingColor = '#38bdf8'; 
+            const glowColor = '#60a5fa'; 
+
+            ctx.save();
+            ctx.shadowColor = glowColor;
+            ctx.shadowBlur = 8; 
+            
+            ctx.fillStyle = satMainColor;
+            ctx.beginPath();
+            ctx.arc(satPxX, satPxY, 5.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 태양광 패널 날개 그리기
+            ctx.strokeStyle = wingColor;
+            ctx.lineWidth = 2; 
+            ctx.beginPath();
+            ctx.moveTo(satPxX - 13, satPxY);
+            ctx.lineTo(satPxX + 13, satPxY);
+            ctx.stroke();
+
+            // Shield Visual Sphere overlay
+            if (upgrades.shield && isShieldCharged && isRunning) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+                ctx.lineWidth = 1.5;
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(satPxX, satPxY, 15, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 5. 힘과 진행 방향 물리 벡터 화살표 그리기
+            if (showVectors) {
+                const satV = Math.sqrt(satVx * satVx + satVy * satVy);
+                
+                if (satV > 0) {
+                    const vxDirX = satVx / satV;
+                    const vxDirY = satVy / satV;
+                    
+                    const arrowLength = 55;
+                    const velEndX = satPxX + vxDirX * arrowLength;
+                    const velEndY = satPxY + vxDirY * arrowLength;
+
+                    drawArrow(satPxX, satPxY, velEndX, velEndY, '#f59e0b', '운동 방향 (v)', 2.5);
+
+                    const rDist = Math.sqrt(satX * satX + satY * satY);
+                    const gravEndX = satPxX - (satX / rDist) * arrowLength;
+                    const gravEndY = satPxY - (satY / rDist) * arrowLength;
+
+                    drawArrow(satPxX, satPxY, gravEndX, gravEndY, '#ef4444', '중력 방향 (F_g)', 2.5);
+                }
+            }
+        }
+
+        // 아름다운 물리 벡터 화살표 그리기 헬퍼 함수
+        function drawArrow(fromx, fromy, tox, toy, color, labelText, lineWidth) {
+            const headlen = 8; 
+            const dx = tox - fromx;
+            const dy = toy - fromy;
+            const angle = Math.atan2(dy, dx);
+            
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = lineWidth;
+            
+            ctx.beginPath();
+            ctx.moveTo(fromx, fromy);
+            ctx.lineTo(tox, toy);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(tox, toy);
+            ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.font = 'bold 9px sans-serif';
+            ctx.fillStyle = color;
+            ctx.fillText(labelText, tox + 6 * Math.cos(angle), toy + 6 * Math.sin(angle) + 2);
+        }
+
+        // Realtime Dashboard Values Update
+        function updateDashboard(altitude, speed) {
+            valVel.textContent = speed.toFixed(2);
+            valAlt.textContent = Math.max(0, Math.round(altitude)).toLocaleString();
+            
+            const currentMass = activeMass !== null ? activeMass : 0;
+            valMass.textContent = currentMass.toLocaleString();
+
+            // 만유인력 크기 계산 공식 연동: F = G * m1 * m2 / r^2
+            if (altitude > 0 && currentMass > 0) {
+                const r_meters = (R_earth + altitude) * 1000;
+                const force = (G * M * currentMass) / (r_meters * r_meters);
+                valForce.textContent = force.toFixed(1);
+            } else {
+                valForce.textContent = "0.00";
+            }
+        }
+
+        // Realtime State Labels & Mission check 연동
+        function updateStatusLabel(altitude, speed) {
+            const r = Math.sqrt(satX * satX + satY * satY);
+            const mu = 398600.4418; // GM constant (km^3/s^2)
+
+            const energy = (speed * speed) / 2 - mu / r;
+            const hMom = satX * satVy - satY * satVx;
+            const eSq = 1 + (2 * energy * hMom * hMom) / (mu * mu);
+            const eccentricity = eSq > 0 ? Math.sqrt(eSq) : 0;
+
+            let statusText = "타원궤도 비행";
+
+            if (altitude <= 0) {
+                statusText = "추락 완료";
+                orbitStatusBadge.textContent = "추락 완료";
+                orbitStatusBadge.className = "px-2.5 py-1 rounded text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/30";
+            } else if (energy >= 0) {
+                statusText = "탈출 쌍곡선";
+                orbitStatusBadge.textContent = "탈출 쌍곡선";
+                orbitStatusBadge.className = "px-2.5 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
+            } else if (eccentricity < 0.06) {
+                statusText = "원궤도 비행";
+                orbitStatusBadge.textContent = "원궤도 비행";
+                orbitStatusBadge.className = "px-2.5 py-1 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else {
+                statusText = "타원궤도 비행";
+                orbitStatusBadge.textContent = "타원궤도 비행";
+                orbitStatusBadge.className = "px-2.5 py-1 rounded text-xs font-bold bg-violet-500/20 text-violet-400 border border-violet-500/30";
+            }
+
+            checkMissionSuccess(statusText, altitude, speed);
+        }
+
+        function showCrash() {
+            crashOverlay.classList.remove('pointer-events-none', 'opacity-0');
+            crashOverlay.classList.add('opacity-100');
+            updateUIState();
+        }
+
+        function showEscape() {
+            escapeOverlay.classList.remove('pointer-events-none', 'opacity-0');
+            escapeOverlay.classList.add('opacity-100');
+            updateUIState();
+        }
+
+        // Custom Error Modal triggers
+        function showSystemError(errors) {
+            errorDetails.innerHTML = errors.join('<br>');
+            systemErrorOverlay.classList.remove('pointer-events-none', 'opacity-0');
+            systemErrorOverlay.classList.add('opacity-100', 'pointer-events-auto');
+        }
+
+        btnCloseError.addEventListener('click', () => {
+            systemErrorOverlay.classList.add('pointer-events-none', 'opacity-0');
+            systemErrorOverlay.classList.remove('opacity-100', 'pointer-events-auto');
+        });
+
+        // UI State Controller
+        function updateUIState() {
+            if (isRunning) {
+                btnLaunchCard.disabled = true;
+                btnLaunchCard.className = "w-full py-3 rounded-xl text-center font-black text-sm tracking-widest bg-slate-800 text-slate-500 cursor-not-allowed transition-all duration-300";
+                btnLaunchCard.textContent = "🛰️ 위성이 궤도를 돌고 있습니다";
+
+                btnPause.disabled = false;
+                btnPause.className = "py-2.5 rounded-xl text-center font-bold text-xs bg-amber-600 border border-amber-500 text-white hover:bg-amber-500 transition active:scale-98 cursor-pointer";
+                btnPause.textContent = "⏸️ 비행 일시정지";
+            } else {
+                checkReadyToLaunch();
+                
+                if (slotContents.speed !== null && slotContents.angle !== null && slotContents.mass !== null) {
+                    btnPause.disabled = false;
+                    btnPause.className = "py-2.5 rounded-xl text-center font-bold text-xs bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white transition active:scale-98 cursor-pointer";
+                    btnPause.textContent = "▶️ 비행 재개";
+                } else {
+                    btnPause.disabled = true;
+                    btnPause.className = "py-2.5 rounded-xl text-center font-bold text-xs bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-50";
+                    btnPause.textContent = "⏸️ 비행 일시정지";
+                }
+            }
+        }
+
+        // Simulation Main Loop
+        function loop(timestamp) {
+            if (!isRunning) {
+                lastTimestamp = null;
+                return;
+            }
+
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const dt = (timestamp - lastTimestamp) / 1000;
+            lastTimestamp = timestamp;
+
+            const cappedDt = Math.min(dt, 0.05);
+
+            updatePhysics(cappedDt);
+            drawSpace();
+
+            requestAnimationFrame(loop);
+        }
+
+        // Reset All State
+        function resetSimulation() {
+            isRunning = false;
+            lastTimestamp = null;
+            pathHistory = [];
+            stageTargetTime = 0; 
+            particles = []; 
+            explosionParticles = []; 
+            
+            // 각도 및 진행률 초기화
+            previousAngle = null;
+            cumulativeAngle = 0;
+
+            // Hide overlays
+            crashOverlay.classList.add('pointer-events-none', 'opacity-0');
+            crashOverlay.classList.remove('opacity-100');
+            escapeOverlay.classList.add('pointer-events-none', 'opacity-0');
+            escapeOverlay.classList.remove('opacity-100');
+            systemErrorOverlay.classList.add('pointer-events-none', 'opacity-0');
+            systemErrorOverlay.classList.remove('opacity-100', 'pointer-events-auto');
+
+            // Setup initial position (At 2,000 km altitude)
+            satX = 0;
+            satY = -(R_earth + 2000);
+
+            // Verify if card setup is valid before applying preview values
+            const isSpeedValid = slotContents.speed && slotContents.speed.type === 'speed';
+            const isAngleValid = slotContents.angle && slotContents.angle.type === 'angle';
+
+            if (isSpeedValid && isAngleValid) {
+                activeSpeed = slotContents.speed.value;
+                activeAngle = slotContents.angle.value;
+                
+                const angleRad = (activeAngle * Math.PI) / 180;
+                satVx = activeSpeed * Math.cos(angleRad);
+                satVy = -activeSpeed * Math.sin(angleRad); 
+            } else {
+                satVx = 0;
+                satVy = 0;
+                activeSpeed = null;
+                activeAngle = null;
+            }
+
+            activeMass = (slotContents.mass && slotContents.mass.type === 'mass') ? slotContents.mass.value : null;
+
+            drawSpace();
+            updateDashboard(2000, activeSpeed !== null ? activeSpeed : 0);
+            updateUIState();
+            updateProgressBar(2000);
+        }
+
+        // 일시정지 버튼 작동
+        btnPause.addEventListener('click', () => {
+            if (isRunning) {
+                isRunning = false;
+            } else {
+                if (slotContents.speed !== null && slotContents.angle !== null && slotContents.mass !== null) {
+                    isRunning = true;
+                    requestAnimationFrame(loop);
+                }
+            }
+            updateUIState();
+        });
+
+        // Global Reset (including card slots)
+        btnReset.addEventListener('click', () => {
+            activeSpeed = null;
+            activeAngle = null;
+            activeMass = null;
+            slotContents = { speed: null, angle: null, mass: null };
+
+            slots.speed.innerHTML = `<span class="text-[11px] text-slate-500">속력 카드를<br>넣어주세요</span>`;
+            slots.angle.innerHTML = `<span class="text-[11px] text-slate-500">방향 카드를<br>넣어주세요</span>`;
+            slots.mass.innerHTML = `<span class="text-[11px] text-slate-500">무게 카드를<br>넣어주세요</span>`;
+
+            resetSimulation();
+        });
+
+        function translateType(type) {
+            if (type === 'speed') return '속력';
+            if (type === 'angle') return '방향';
+            if (type === 'mass') return '무게';
+            return '미확인';
+        }
+
+        // Launch satellite using cards (Validation done HERE upon launch!)
+        btnLaunchCard.addEventListener('click', () => {
+            if (slotContents.speed !== null && slotContents.angle !== null && slotContents.mass !== null) {
+                let errors = [];
+                
+                if (slotContents.speed.type !== 'speed') {
+                    errors.push(`• <strong>발사 속력 슬롯</strong>에 잘못된 카드가 장착되었습니다.<br>&nbsp;&nbsp;&nbsp;(장착된 카드 종류: [${translateType(slotContents.speed.type)}])`);
+                }
+                if (slotContents.angle.type !== 'angle') {
+                    errors.push(`• <strong>발사 방향 슬롯</strong>에 잘못된 카드가 장착되었습니다.<br>&nbsp;&nbsp;&nbsp;(장착된 카드 종류: [${translateType(slotContents.angle.type)}])`);
+                }
+                if (slotContents.mass.type !== 'mass') {
+                    errors.push(`• <strong>위성 무게 슬롯</strong>에 잘못된 카드가 장착되었습니다.<br>&nbsp;&nbsp;&nbsp;(장착된 카드 종류: [${translateType(slotContents.mass.type)}])`);
+                }
+
+                if (errors.length > 0) {
+                    showSystemError(errors); 
+                } else {
+                    resetSimulation();
+                    isRunning = true;
+                    updateUIState();
+                    requestAnimationFrame(loop);
+                }
+            }
+        });
+
+        // Toggle vectors
+        btnToggleVectors.addEventListener('click', () => {
+            showVectors = !showVectors;
+            btnToggleVectors.textContent = showVectors ? "벡터 숨기기" : "벡터 보이기";
+            drawSpace();
+        });
+
+        // Setup Canvas responsive sizing
+        window.resizeCanvas = function() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            scale = (canvas.height * 0.42) / maxRadius;
+            drawSpace();
+        }
+        window.addEventListener('resize', window.resizeCanvas);
+
+        // Initialize on load & start Stage 1
+        window.onload = function() {
+            window.resizeCanvas();
+            loadStage(0);
+        }
+    </script>
+</body>
+</html>
